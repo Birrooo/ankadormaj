@@ -20,6 +20,7 @@ from difflib import SequenceMatcher  # Pour la distance de Levenshtein simplifi�
 from selenium.webdriver.common.keys import Keys
 from pynput.keyboard import Controller, Key
 import subprocess
+import sys
 
 pyautogui.FAILSAFE = False
 
@@ -39,8 +40,40 @@ def detecter_image_et_lancer_script():
     # Convertir de RGB à BGR (car OpenCV utilise BGR)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
+def get_resource_path(relative_path):
+    try:
+        # Si l'application est en mode "gelé" (compilé en .exe avec Nuitka ou PyInstaller)
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS  # Chemin temporaire où les fichiers sont extraits
+        else:
+            # Si tu es dans l'environnement de développement
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        # Retourne le chemin complet du fichier
+        return os.path.join(base_path, relative_path)
+    
+    except Exception as e:
+        print(f"Erreur lors de la récupération du chemin : {e}")
+        return None
+
+def detecter_image_et_lancer_script():
+    # Utiliser la fonction pour obtenir le chemin complet du fichier image de référence
+    template_path = get_resource_path("refereindice.png")
+    
+    if template_path is None:
+        print("Erreur : le chemin de l'image de référence est invalide.")
+        return
+
     # Charger l'image de référence des points d'interrogation
-    template = cv2.imread('refereindice.png', cv2.IMREAD_GRAYSCALE)
+    template = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
+    
+    # Vérifier si l'image a bien été chargée
+    if template is None:
+        print(f"Erreur : l'image de référence {template_path} n'a pas pu être chargée.")
+        return
+
+    # (Vous pouvez ajouter le reste de votre logique ici pour utiliser `template`)
+    print("L'image de référence a été chargée avec succès.")
 
     # Convertir l'image capturée en niveaux de gris
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -70,19 +103,19 @@ def detecter_image_et_lancer_script():
     # Logique pour lancer les scripts en fonction du nombre de correspondances
     if num_matches == 5:
         print("5 correspondances détectées, lancement de step6_treasure...")
-        subprocess.run(["python", "treasure_6step.py"])  # Remplace par ton script exact
+        subprocess.run(["python", "treasure_6.py"])  # Remplace par ton script exact
     elif num_matches == 4:
         print("4 correspondances détectées, lancement de step5_treasure...")
-        subprocess.run(["python", "treasure_5step.py"])  # Remplace par ton script exact
+        subprocess.run(["python", "treasure_5.py"])  # Remplace par ton script exact
     elif num_matches == 3:
         print("3 correspondances détectées, lancement de step4_treasure...")
-        subprocess.run(["python", "treasure_4step.py"])  # Remplace par ton script exact
+        subprocess.run(["python", "treasure_4.py"])  # Remplace par ton script exact
     elif num_matches == 2:
         print("2 correspondances détectées, lancement de 3step_treasure...")
-        subprocess.run(["python", "treasure_3step.py"])  # Remplace par ton script exact
+        subprocess.run(["python", "treasure_3.py"])  # Remplace par ton script exact
     elif num_matches == 1:
         print("1 correspondances détectées, lancement de step2_treasure...")
-        subprocess.run(["python", "treasure_2step.py"])  # Remplace par ton script exact
+        subprocess.run(["python", "treasure_2.py"])  # Remplace par ton script exact
     else:
         print(f"Aucune action pour {num_matches} correspondances.")
 

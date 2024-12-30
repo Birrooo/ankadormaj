@@ -4,7 +4,7 @@ import requests
 import hashlib
 import subprocess  # Importer subprocess pour exécuter des scripts Python
 import os
-import signal
+import sys
 
 # Configuration de l'interface
 customtkinter.set_appearance_mode("dark")
@@ -130,7 +130,7 @@ def open_new_window():
         else:
             button_start.configure(text="STOP", command=toggle_button)  # Change en STOP
             print("Lancement de l'application.")
-            process = subprocess.Popen(["python", "testwb.py"])  # Lance le script testwb.py
+            process = subprocess.Popen(["python", get_resource_path('start_treasure.py')])  # Lance start_treasure.py
         is_running = not is_running  # Inverse l'état de is_running
 
     # Crée un bouton "START" avec texte blanc
@@ -156,6 +156,10 @@ def open_new_window():
     # Lance la boucle principale pour la nouvelle fenêtre
     new_window.mainloop()
 
+# Fonction pour obtenir le chemin des fichiers intégrés dans l'exécutable
+def get_resource_path(resource_name):
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, resource_name)
 
 # Interface graphique
 frame = customtkinter.CTkFrame(master=root, fg_color="#000000")
