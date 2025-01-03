@@ -116,42 +116,30 @@ def open_new_window():
 
     # Variable pour suivre l'état du bouton (START ou STOP)
     is_running = False
-    process = None  # Variable pour stocker le processus lancé
+    processes = []  # Liste pour stocker les processus lancés
 
     # Fonction pour gérer le changement de texte du bouton
     def toggle_button():
-        nonlocal is_running, process  # Permet de modifier la variable is_running et process
+        nonlocal is_running  # Permet de modifier la variable is_running
         if is_running:
             button_start.configure(text="START", command=toggle_button)  # Change en START
-            if process:
-                print("Arrêt de l'application.")
+            # Arrêter tous les processus
+            for process in processes:
+                print("Arrêt du processus.")
                 process.terminate()  # Arrêter le processus
-                process = None
+            processes.clear()  # Réinitialiser la liste de processus
         else:
             button_start.configure(text="STOP", command=toggle_button)  # Change en STOP
             print("Lancement de l'application.")
+            # Lance plusieurs processus et les ajoute à la liste
             process = subprocess.Popen(["python", get_resource_path('start_treasure.py')])  # Lance start_treasure.py
+            processes.append(process)  # Ajouter le processus à la liste
+            # Vous pouvez ajouter d'autres processus ici si nécessaire
         is_running = not is_running  # Inverse l'état de is_running
 
     # Crée un bouton "START" avec texte blanc
     button_start = customtkinter.CTkButton(new_window, text="START", command=toggle_button, text_color="#ffffff", fg_color="#444444")
     button_start.pack(pady=30)
-
-    # Fonction pour gérer le raccourci clavier F10 pour arrêter le processus
-    def on_f10(event):
-        nonlocal is_running, process
-        if is_running:
-            button_start.configure(text="START", command=toggle_button)  # Change en START
-            if process:
-                print("Arrêt de l'application (via F10).")
-                process.terminate()  # Arrêter le processus
-                process = None
-            is_running = False  # Mettre à jour l'état du bouton
-        else:
-            print("Rien à arrêter, l'application n'est pas en cours d'exécution.")
-
-    # Lier la touche F10 à la fonction on_f10
-    new_window.bind("<F10>", on_f10)
 
     # Lance la boucle principale pour la nouvelle fenêtre
     new_window.mainloop()
@@ -171,7 +159,7 @@ logo_resized_image = logo_pil_image.resize((80, 80))
 logo_tk_image = ImageTk.PhotoImage(logo_resized_image)
 
 # Garder la référence à l'image pour éviter qu'elle ne soit supprimée
-logo_label = customtkinter.CTkLabel(master=frame, image=logo_tk_image, text="")
+logo_label = customtkinter.CTkLabel(master=frame, image=logo_tk_image, text="")  
 logo_label.image = logo_tk_image  # Assurez-vous de garder une référence à l'image
 logo_label.pack(pady=10)
 

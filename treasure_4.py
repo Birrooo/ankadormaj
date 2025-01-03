@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support import expected_conditions as EC
 import win32gui
 import win32con
 import os
@@ -197,88 +198,76 @@ DATABASE = [
         "Tube rempli de tofus"
 ]
 
+# Fonction pour obtenir le chemin correct des ressources
+def get_resource_path(relative_path):
+    if getattr(sys, 'frozen', False):  # Si l'exécutable est en cours d'exécution
+        base_path = sys._MEIPASS  # Dossier temporaire d'extraction
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+# Fonction principale pour détecter l'image et lancer un script
 def detecter_image_et_lancer_script():
-    # Spécifie la zone à capturer : (left, top, width, height)
-    zone = (2, 303, 209, 134)
-
-    # Capture l'écran dans la zone spécifiée
+    zone = (15, 299, 83, 454)
     screenshot = pyautogui.screenshot(region=zone)
-
-    # Convertir l'image en format numpy array pour OpenCV
     image = np.array(screenshot)
-
-    # Convertir de RGB à BGR (car OpenCV utilise BGR)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-    # Charger l'image de référence des points d'interrogation
-    template = cv2.imread('refereindice.png', cv2.IMREAD_GRAYSCALE)
+    # Charger l'image de référence
+    template_path = get_resource_path('refereindice.png')
+    template = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
 
-    # Convertir l'image capturée en niveaux de gris
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # Appliquer le template matching
     result = cv2.matchTemplate(gray_image, template, cv2.TM_CCOEFF_NORMED)
-
-    # Définir un seuil pour détecter la correspondance
-    threshold = 0.8  # Ajuste ce seuil selon le cas
-
-    # Trouver les positions où il y a une correspondance
+    threshold = 0.8
     locations = np.where(result >= threshold)
-
-    # Nombre de correspondances trouvées
     num_matches = len(locations[0])
+
     print(f"Nombre de correspondances détectées : {num_matches}")
 
-    # Afficher les correspondances sur l'image
     for pt in zip(*locations[::-1]):
         cv2.rectangle(image, pt, (pt[0] + template.shape[1], pt[1] + template.shape[0]), (0, 255, 0), 2)
 
-    # Afficher l'image avec les rectangles dessinés autour des correspondances
-    # Remplacer cv2.imshow par PIL Image.show
-    # image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    # image_pil.show()
+    capture_box = (128, 273, 290, 367)
 
-    # Définir les coordonnées de la zone à capturer
-    capture_box = (184, 279, 272, 344)
-    # Logique pour lancer les scripts en fonction du nombre de correspondances
-    if num_matches == 5:
-        print("5 correspondances détectées, lancement de big6_treasure...")
-        subprocess.run(["python", "treasure_6.py"])  # Remplace par ton script exact
-    elif num_matches == 4:
-        print("4 correspondances détectées, lancement de big5_treasure...")
-        subprocess.run(["python", "treasure_5.py"])  # Remplace par ton script exact
-    elif num_matches == 3:
-        print("3 correspondances détectées, lancement de big4_treasure...")
-        subprocess.run(["python", "treasure_4.py"])  # Remplace par ton script exact
-    elif num_matches == 2:
-        print("2 correspondances détectées, lancement de 3big_treasure...")
-        subprocess.run(["python", "treasure_3.py"])  # Remplace par ton script exact
-    elif num_matches == 1:
-        print("1 correspondances détectées, lancement de big2_treasure...")
-        subprocess.run(["python", "treasure_2.py"])  # Remplace par ton script exact
-    else:
-        print(f"Aucune action pour {num_matches} correspondances.")
-
-        # Capture la zone spécifiée de l'écran
-        screenshot = ImageGrab.grab(bbox=capture_box)
-        
-        # Recherche de l'image de référence dans la capture
-        reference_image = "img/combat.png"
-        print("Recherche de l'image de référence combat.png...")
-        
-        try:
-            # Recherche de l'image dans la capture de l'écran
-            location = pyautogui.locateOnScreen(reference_image)
+    try:
+        # Sélection du script à exécuter en fonction du nombre de correspondances
+        if num_matches == 5:
+            script_name = 'treasure_6.py'
+        elif num_matches == 4:
+            script_name = 'treasure_5.py'
+        elif num_matches == 3:
+            script_name = 'treasure_4.py'
+        elif num_matches == 2:
+            script_name = 'treasure_3.py'
+        elif num_matches == 1:
+            script_name = 'treasure_2.py'
+        else:
+            # Capture d'écran pour détecter l'image "combat.png"
+            screenshot = ImageGrab.grab(bbox=capture_box)
+            reference_image = get_resource_path("img/combat.png")
+            print("Recherche de l'image de référence combat.png...")
             
-            if location:
-                print("Image de référence trouvée, lancement du script combat.py...")
-                subprocess.run(["python", "combat.py"])  # Remplace par ton script exact
-            else:
-                print("Image de référence non trouvée, lancement du script treasure_1.py...")
-                subprocess.run(["python", "treasure_1.py"])  # Remplace par ton script exact
-        except Exception as e:
-            print(f"Erreur lors de la recherche de l'image de référence : {e}")
+            # Recherche dynamique dans le répertoire temporaire
+            location = pyautogui.locateOnScreen(reference_image, confidence=0.8)
 
+            if location:
+                script_name = 'combat.py'
+            else:
+                script_name = 'treasure_1.py'
+
+        # Obtenir le chemin du script sélectionné
+        script_path = get_resource_path(script_name)
+
+        # Vérification de l'existence du script et exécution
+        if os.path.exists(script_path):
+            print(f"Lancement du script : {script_name}")
+            subprocess.run([sys.executable, script_path])  # Utilisation de sys.executable pour garantir la bonne version de Python
+        else:
+            print(f"Erreur : Le script {script_path} est introuvable.")
+
+    except Exception as e:
+        print(f"Erreur : {e}")
 
 # Fonction pour calculer la similarité (distance de Levenshtein)
 def levenshtein_similarity(a, b):
@@ -376,9 +365,6 @@ def manipulate_coordinates(extracted_text):
     # Maximiser la fenêtre du navigateur
     options.add_argument('--start-maximized')
     
-    # Utiliser le profil utilisateur de Brave
-    options.add_argument('user-data-dir=C:\\Users\\ElMeroo\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default')
-    
     # Spécifier l'emplacement de Brave (le chemin de l'exécutable)
     options.binary_location = "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
     
@@ -387,9 +373,6 @@ def manipulate_coordinates(extracted_text):
     
     # **Masquer les propriétés WebDriver** pour éviter la détection
     options.add_argument("--disable-blink-features=AutomationControlled")  # Masque l'indicateur WebDriver
-    
-    # **Utilisation d'un proxy pour changer l'adresse IP (si nécessaire)** 
-    # options.add_argument('--proxy-server=http://your_proxy:port')
     
     # Initialiser le navigateur Brave avec ChromeDriver
     driver = webdriver.Chrome(options=options)
@@ -404,6 +387,16 @@ def manipulate_coordinates(extracted_text):
         # Ouvrir la page URL
         driver.get('https://dofusdb.fr/fr/tools/treasure-hunt')
         time.sleep(2)  # Attendre que la page se charge
+        
+        # Trouver la case à cocher
+        checkbox = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.q-checkbox__inner.relative-position.non-selectable.q-checkbox__inner--falsy')))
+        
+        # Vérifier si la case est cochée. Si ce n'est pas le cas, cliquez pour la cocher.
+        if 'q-checkbox__inner--falsy' in checkbox.get_attribute('class'):
+            print("La case n'est pas cochée, on va la cocher.")
+            checkbox.click()
+        else:
+            print("La case est déjà cochée.")
         
         # Trouver les champs d'input de type "number"
         numberInputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="number"]')
@@ -641,35 +634,68 @@ def main():
         except Exception as e:
             print(f"Erreur lors de la saisie dans le champ de recherche : {e}")
         
-        # Vérification de l'apparition de phorreur.png après le clic
-        # Capture de la zone pour détecter phorreur.png
-        phorreur_image = capture_zone(656, 682, 1027, 788)
-        phorreur_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'phorreur.png')
+    # Fonction pour obtenir le chemin du fichier, que ce soit dans l'environnement de développement ou dans l'exécutable
+    def get_resource_path(relative_path):
+        try:
+            # Si l'application est en mode "gelé" (compilé en .exe avec Nuitka)
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS  # Chemin temporaire où les fichiers sont extraits
+            else:
+                # Si tu es dans l'environnement de développement
+                base_path = os.path.dirname(os.path.abspath(__file__))
 
-        # Trouver la meilleure correspondance
-        best_match_phorreur, similarity = find_matching_image(phorreur_image, folder_path=os.path.dirname(phorreur_path))
+            # Retourne le chemin complet du fichier
+            return os.path.join(base_path, relative_path)
+        
+        except Exception as e:
+            print(f"Erreur lors de la récupération du chemin : {e}")
+            return None
 
-        # Ajouter un log détaillé de similarité
-        print(f"Similarité calculée : {similarity:.2f}")
 
-        # Vérifier si la correspondance est assez bonne
-        if best_match_phorreur and similarity > 0.9:  # Seuil augmenté
-            print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
-            print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
-            find_dofus_window()
-            print("Fenêtre Dofus mise au premier plan.")
-            time.sleep(0.5)
-            click(276, 172)
-            time.sleep(0.5)
-            click(372, 413)
-            time.sleep(0.5)
-            keyboard.press(Key.enter)  # Appuyer sur la touche Enter
-            keyboard.release(Key.enter)
-            time.sleep(0.5)
-            subprocess.Popen(["python", "start_treasure.py"]) # Le best_match envoie au script find_phorreur.py le dernier résultat du direction de l'indice donc pour le phorreur
-            sys.exit()
+    # Vérification de l'apparition de phorreur.png après le clic
+    # Capture de la zone pour détecter phorreur.png
+    phorreur_image = capture_zone(656, 682, 1027, 788)
+    phorreur_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'phorreur.png')
+
+    # Trouver la meilleure correspondance
+    best_match_phorreur, similarity = find_matching_image(phorreur_image, folder_path=os.path.dirname(phorreur_path))
+
+    # Ajouter un log détaillé de similarité
+    print(f"Similarité calculée : {similarity:.2f}")
+
+    # Vérifier si la correspondance est assez bonne
+    if best_match_phorreur and similarity > 0.9:  # Seuil augmenté
+        print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
+        print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
+        
+        find_dofus_window()
+        print("Fenêtre Dofus mise au premier plan.")
+        
+        time.sleep(0.5)
+        click(276, 172)
+        
+        time.sleep(0.5)
+        click(372, 413)
+        
+        time.sleep(0.5)
+        keyboard.press(Key.enter)  # Appuyer sur la touche Enter
+        keyboard.release(Key.enter)
+        
+        time.sleep(0.5)
+
+        # Utilisation de get_resource_path pour obtenir le bon chemin vers start_treasure.py
+        start_treasure_path = get_resource_path('start_treasure.py')
+
+        # Vérifier si le fichier start_treasure.py existe
+        if os.path.exists(start_treasure_path):
+            subprocess.Popen(["python", start_treasure_path])  # Lancer le script avec le chemin correct
         else:
-            print("Aucune image phorreur.png trouvée. Le script continue.")
+            print(f"Erreur : Le fichier {start_treasure_path} est introuvable.")
+
+        sys.exit()
+
+    else:
+        print("Aucune image phorreur.png trouvée. Le script continue.")
 
         # Mettre la fenêtre Dofus au premier plan après avoir effectué l'action sur la flèche
         try:
@@ -897,35 +923,50 @@ def main():
     except Exception as e:
             print(f"Erreur lors de la saisie dans le champ de recherche : {e}")
     
-            # Vérification de l'apparition de phorreur.png après le clic
-        # Capture de la zone pour détecter phorreur.png
-    phorreur_image = capture_zone(655, 681, 750, 778)
+    # Vérification de l'apparition de phorreur.png après le clic
+    # Capture de la zone pour détecter phorreur.png
+    phorreur_image = capture_zone(656, 682, 1027, 788)
     phorreur_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'phorreur.png')
 
-        # Trouver la meilleure correspondance
+    # Trouver la meilleure correspondance
     best_match_phorreur, similarity = find_matching_image(phorreur_image, folder_path=os.path.dirname(phorreur_path))
 
-        # Ajouter un log détaillé de similarité
+    # Ajouter un log détaillé de similarité
     print(f"Similarité calculée : {similarity:.2f}")
 
-        # Vérifier si la correspondance est assez bonne
+    # Vérifier si la correspondance est assez bonne
     if best_match_phorreur and similarity > 0.9:  # Seuil augmenté
-            print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
-            print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
-            find_dofus_window()
-            print("Fenêtre Dofus mise au premier plan.")
-            time.sleep(0.5)
-            click(276, 172)
-            time.sleep(0.5)
-            click(372, 413)
-            time.sleep(0.5)
-            keyboard.press(Key.enter)  # Appuyer sur la touche Enter
-            keyboard.release(Key.enter)
-            time.sleep(0.5)
-            subprocess.Popen(["python", "start_treasure.py"]) # Le best_match envoie au script find_phorreur.py le dernier résultat du direction de l'indice donc pour le phorreur
-            sys.exit()
+        print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
+        print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
+        
+        find_dofus_window()
+        print("Fenêtre Dofus mise au premier plan.")
+        
+        time.sleep(0.5)
+        click(276, 172)
+        
+        time.sleep(0.5)
+        click(372, 413)
+        
+        time.sleep(0.5)
+        keyboard.press(Key.enter)  # Appuyer sur la touche Enter
+        keyboard.release(Key.enter)
+        
+        time.sleep(0.5)
+
+        # Utilisation de get_resource_path pour obtenir le bon chemin vers start_treasure.py
+        start_treasure_path = get_resource_path('start_treasure.py')
+
+        # Vérifier si le fichier start_treasure.py existe
+        if os.path.exists(start_treasure_path):
+            subprocess.Popen(["python", start_treasure_path])  # Lancer le script avec le chemin correct
+        else:
+            print(f"Erreur : Le fichier {start_treasure_path} est introuvable.")
+
+        sys.exit()
+
     else:
-            print("Aucune image phorreur.png trouvée. Le script continue.")
+        print("Aucune image phorreur.png trouvée. Le script continue.")
 
         # Mettre la fenêtre Dofus au premier plan après avoir effectué l'action sur la flèche
     try:
@@ -1109,7 +1150,7 @@ def main():
         direction = 'down'
 
     # Capture du troisième indice (au lieu de in2)
-    in3_zone_bbox = (30, 334, 192, 366)  # Nouvelle zone de capture pour in3
+    in3_zone_bbox = (34, 333, 184, 366)  # Nouvelle zone de capture pour in3
     print(f"Capture du troisième indice : {in3_zone_bbox}")
     in3_image = capture_zone(*in3_zone_bbox)  # Utilisation de in3_zone_bbox
     file_name = f"vindice_3.png"
@@ -1154,34 +1195,49 @@ def main():
         print(f"Erreur lors de la saisie dans le champ de recherche : {e}")
     
     # Vérification de l'apparition de phorreur.png après le clic
-        # Capture de la zone pour détecter phorreur.png
-    phorreur_image = capture_zone(655, 681, 750, 778)
+    # Capture de la zone pour détecter phorreur.png
+    phorreur_image = capture_zone(656, 682, 1027, 788)
     phorreur_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'phorreur.png')
 
-        # Trouver la meilleure correspondance
+    # Trouver la meilleure correspondance
     best_match_phorreur, similarity = find_matching_image(phorreur_image, folder_path=os.path.dirname(phorreur_path))
 
-        # Ajouter un log détaillé de similarité
+    # Ajouter un log détaillé de similarité
     print(f"Similarité calculée : {similarity:.2f}")
 
-        # Vérifier si la correspondance est assez bonne
+    # Vérifier si la correspondance est assez bonne
     if best_match_phorreur and similarity > 0.9:  # Seuil augmenté
-            print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
-            print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
-            find_dofus_window()
-            print("Fenêtre Dofus mise au premier plan.")
-            time.sleep(0.5)
-            click(276, 172)
-            time.sleep(0.5)
-            click(372, 413)
-            time.sleep(0.5)
-            keyboard.press(Key.enter)  # Appuyer sur la touche Enter
-            keyboard.release(Key.enter)
-            time.sleep(0.5)
-            subprocess.Popen(["python", "start_treasure.py"]) # Le best_match envoie au script find_phorreur.py le dernier résultat du direction de l'indice donc pour le phorreur
-            sys.exit()
+        print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
+        print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
+        
+        find_dofus_window()
+        print("Fenêtre Dofus mise au premier plan.")
+        
+        time.sleep(0.5)
+        click(276, 172)
+        
+        time.sleep(0.5)
+        click(372, 413)
+        
+        time.sleep(0.5)
+        keyboard.press(Key.enter)  # Appuyer sur la touche Enter
+        keyboard.release(Key.enter)
+        
+        time.sleep(0.5)
+
+        # Utilisation de get_resource_path pour obtenir le bon chemin vers start_treasure.py
+        start_treasure_path = get_resource_path('start_treasure.py')
+
+        # Vérifier si le fichier start_treasure.py existe
+        if os.path.exists(start_treasure_path):
+            subprocess.Popen(["python", start_treasure_path])  # Lancer le script avec le chemin correct
+        else:
+            print(f"Erreur : Le fichier {start_treasure_path} est introuvable.")
+
+        sys.exit()
+
     else:
-            print("Aucune image phorreur.png trouvée. Le script continue.")
+        print("Aucune image phorreur.png trouvée. Le script continue.")
 
     # Mettre la fenêtre Dofus au premier plan après avoir effectué l'action sur la flèche
     try:
@@ -1410,34 +1466,49 @@ def main():
         print(f"Erreur lors de la saisie dans le champ de recherche : {e}")
     
     # Vérification de l'apparition de phorreur.png après le clic
-        # Capture de la zone pour détecter phorreur.png
-    phorreur_image = capture_zone(655, 681, 750, 778)
+    # Capture de la zone pour détecter phorreur.png
+    phorreur_image = capture_zone(656, 682, 1027, 788)
     phorreur_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'phorreur.png')
 
-        # Trouver la meilleure correspondance
+    # Trouver la meilleure correspondance
     best_match_phorreur, similarity = find_matching_image(phorreur_image, folder_path=os.path.dirname(phorreur_path))
 
-        # Ajouter un log détaillé de similarité
+    # Ajouter un log détaillé de similarité
     print(f"Similarité calculée : {similarity:.2f}")
 
-        # Vérifier si la correspondance est assez bonne
+    # Vérifier si la correspondance est assez bonne
     if best_match_phorreur and similarity > 0.9:  # Seuil augmenté
-            print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
-            print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
-            find_dofus_window()
-            print("Fenêtre Dofus mise au premier plan.")
-            time.sleep(0.5)
-            click(276, 172)
-            time.sleep(0.5)
-            click(372, 413)
-            time.sleep(0.5)
-            keyboard.press(Key.enter)  # Appuyer sur la touche Enter
-            keyboard.release(Key.enter)
-            time.sleep(0.5)
-            subprocess.Popen(["python", "start_treasure.py"]) # Le best_match envoie au script find_phorreur.py le dernier résultat du direction de l'indice donc pour le phorreur
-            sys.exit()
+        print(f"Meilleure correspondance trouvée : {best_match_phorreur} ({similarity:.2f})")
+        print("Image phorreur.png détectée. Abandon de la chasse pour en lancer une nouvelle...")
+        
+        find_dofus_window()
+        print("Fenêtre Dofus mise au premier plan.")
+        
+        time.sleep(0.5)
+        click(276, 172)
+        
+        time.sleep(0.5)
+        click(372, 413)
+        
+        time.sleep(0.5)
+        keyboard.press(Key.enter)  # Appuyer sur la touche Enter
+        keyboard.release(Key.enter)
+        
+        time.sleep(0.5)
+
+        # Utilisation de get_resource_path pour obtenir le bon chemin vers start_treasure.py
+        start_treasure_path = get_resource_path('start_treasure.py')
+
+        # Vérifier si le fichier start_treasure.py existe
+        if os.path.exists(start_treasure_path):
+            subprocess.Popen(["python", start_treasure_path])  # Lancer le script avec le chemin correct
+        else:
+            print(f"Erreur : Le fichier {start_treasure_path} est introuvable.")
+
+        sys.exit()
+
     else:
-            print("Aucune image phorreur.png trouvée. Le script continue.")
+        print("Aucune image phorreur.png trouvée. Le script continue.")
 
     # Mettre la fenêtre Dofus au premier plan après avoir effectué l'action sur la flèche
     try:
